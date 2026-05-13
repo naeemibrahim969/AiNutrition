@@ -38,5 +38,8 @@ nutrition-app/
 ├── requirements.txt
 ├── README.md
 └── static/
-    └── index.html      # Full frontend (single file)
-```
+    ├── app.js    
+    ├── index.html 
+    └── styles.css 
+    
+``` 

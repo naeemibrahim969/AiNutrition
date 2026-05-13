@@ -36,19 +36,110 @@ function toggleGoal(btn) {
     btn.classList.toggle('active');
 }
 
+// ---- FIELD VALIDATION ----
+
+const FIELD_RULES = {
+    age: { min: 10, max: 110, label: 'Age', unit: 'years', integer: true },
+    weight: { min: 30, max: 300, label: 'Weight', unit: 'kg', integer: false },
+    height: { min: 100, max: 250, label: 'Height', unit: 'cm', integer: false },
+};
+
+function validateField(id) {
+    const input = document.getElementById(id);
+    const rule = FIELD_RULES[id];
+    const errEl = document.getElementById(id + '-err');
+    const val = input.value.trim();
+
+    input.classList.remove('field-error', 'field-ok');
+    if (errEl) errEl.textContent = '';
+
+    if (val === '') {
+        input.classList.add('field-error');
+        if (errEl) errEl.textContent = rule.label + ' is required.';
+        return false;
+    }
+
+    const num = parseFloat(val);
+    if (isNaN(num)) {
+        input.classList.add('field-error');
+        if (errEl) errEl.textContent = 'Must be a number.';
+        return false;
+    }
+
+    if (rule.integer && !Number.isInteger(num)) {
+        input.classList.add('field-error');
+        if (errEl) errEl.textContent = rule.label + ' must be a whole number.';
+        return false;
+    }
+
+    if (num < rule.min || num > rule.max) {
+        input.classList.add('field-error');
+        if (errEl) errEl.textContent = rule.label + ' must be between ' + rule.min + ' and ' + rule.max + ' ' + rule.unit + '.';
+        return false;
+    }
+
+    input.classList.add('field-ok');
+    if (errEl) errEl.textContent = '';
+    return true;
+}
+
+function attachLiveValidation() {
+    ['age', 'weight', 'height'].forEach(id => {
+        const input = document.getElementById(id);
+        if (!input) return;
+        input.addEventListener('blur', () => validateField(id));
+        input.addEventListener('input', () => {
+            if (input.value.trim() !== '') validateField(id);
+        });
+    });
+
+    const apiInput = document.getElementById('api-key');
+    if (apiInput) {
+        apiInput.addEventListener('blur', () => {
+            const val = apiInput.value.trim();
+            const errEl = document.getElementById('apikey-err');
+            if (val && !val.startsWith('sk-')) {
+                apiInput.classList.add('field-error');
+                if (errEl) errEl.textContent = 'API key must start with sk-';
+            } else {
+                apiInput.classList.remove('field-error');
+                if (errEl) errEl.textContent = '';
+            }
+        });
+    }
+}
+
+document.addEventListener('DOMContentLoaded', attachLiveValidation);
+
 // ---- ONBOARDING → CHAT TRANSITION ----
 
 function startChat() {
-    const age = document.getElementById('age').value;
-    const weight = document.getElementById('weight').value;
-    const height = document.getElementById('height').value;
+    const age = document.getElementById('age').value.trim();
+    const weight = document.getElementById('weight').value.trim();
+    const height = document.getElementById('height').value.trim();
     const gender = document.getElementById('gender').value;
     const activity = document.getElementById('activity').value;
     apiKey = document.getElementById('api-key').value.trim();
 
+    // Run field-level validation first
+    const ageOk = validateField('age');
+    const weightOk = validateField('weight');
+    const heightOk = validateField('height');
+
     const err = document.getElementById('onboard-error');
-    if (!age || !weight || !height) { err.textContent = 'Please fill in your age, weight, and height.'; return; }
-    if (!apiKey || !apiKey.startsWith('sk-')) { err.textContent = 'Please enter a valid OpenAI API key (starts with sk-).'; return; }
+
+    if (!ageOk || !weightOk || !heightOk) {
+        err.textContent = 'Please fix the errors above before continuing.';
+        return;
+    }
+
+    if (!apiKey || !apiKey.startsWith('sk-')) {
+        err.textContent = 'Please enter a valid OpenAI API key (starts with sk-).';
+        document.getElementById('api-key').classList.add('field-error');
+        return;
+    }
+
+    document.getElementById('api-key').classList.remove('field-error');
     err.textContent = '';
 
     const goals = Array.from(document.querySelectorAll('.goal-btn.active')).map(b => b.textContent.trim());
@@ -125,7 +216,7 @@ function calculateCalories() {
     const goalStr = goals.join(' ').toLowerCase();
     const condStr = conds.join(' ').toLowerCase();
 
-    if (goalStr.includes('weight loss')) { goalAdj = -500; goalNote = '−500 kcal deficit for weight loss'; }
+    if (goalStr.includes('weight loss')) { goalAdj = -500; goalNote = '-500 kcal deficit for weight loss'; }
     else if (goalStr.includes('muscle gain')) { goalAdj = +300; goalNote = '+300 kcal surplus for muscle gain'; }
     else if (goalStr.includes('athletic')) { goalAdj = +200; goalNote = '+200 kcal surplus for performance'; }
 
@@ -162,33 +253,28 @@ function showWelcome() {
         '<p>Profile loaded · Goals: <strong style="color:var(--accent)">' + goalsStr + '</strong></p>' +
 
         '<div class="calorie-box">' +
-
         '<div class="calorie-main">' +
         '<div class="cal-label">Daily Calorie Target</div>' +
         '<div class="cal-value">' + cal.target.toLocaleString() + '<span class="cal-unit"> kcal/day</span></div>' +
         '<div class="cal-note">' + cal.goalNote + '</div>' +
         '</div>' +
-
         '<div class="calorie-meta">' +
         '<div class="cal-meta-item"><span class="cal-meta-label">BMR</span><span class="cal-meta-val">' + cal.bmr.toLocaleString() + ' kcal</span></div>' +
         '<div class="cal-meta-item"><span class="cal-meta-label">TDEE</span><span class="cal-meta-val">' + cal.tdee.toLocaleString() + ' kcal</span></div>' +
         '</div>' +
-
         '<div class="macro-row">' +
         '<div class="macro-item protein"><span class="macro-val">' + cal.protein + 'g</span><span class="macro-lbl">Protein</span></div>' +
         '<div class="macro-item carbs"><span class="macro-val">' + cal.carbs + 'g</span><span class="macro-lbl">Carbs</span></div>' +
         '<div class="macro-item fat"><span class="macro-val">' + cal.fat + 'g</span><span class="macro-lbl">Fat</span></div>' +
         '</div>' +
-
         condBlock +
         '</div>' +
 
         '<p style="margin-top:12px;font-size:0.83rem;color:var(--text-muted)">Tell me about any meal or diet plan and I\'ll analyze it against your targets.</p>' +
         '<div class="suggestion-chips">' +
-        '<span class="chip" onclick="useChip(this)">🍳 I had eggs and toast for breakfast</span>' +
+        '<span class="chip" onclick="useChip(this)">🍳 I had 3 eggs and 1 toast for breakfast</span>' +
         '<span class="chip" onclick="useChip(this)">🥗 Analyze my lunch salad</span>' +
-        '<span class="chip" onclick="useChip(this)">🍕 I ate pizza last night</span>' +
-        '<span class="chip" onclick="useChip(this)">📋 Review my daily meal plan</span>' +
+        '<span class="chip" onclick="useChip(this)">🍕 I ate medium pizza last night</span>' +
         '</div>' +
         '</div>';
 }
@@ -212,7 +298,6 @@ function autoResize(el) {
 // ---- TOPIC GUARD ----
 
 const NUTRITION_KEYWORDS = [
-    // food items & meals
     'food', 'meal', 'eat', 'ate', 'drink', 'drank', 'snack', 'breakfast', 'lunch', 'dinner',
     'recipe', 'ingredient', 'cook', 'diet', 'nutrition', 'calorie', 'caloric',
     'protein', 'carb', 'fat', 'fiber', 'sugar', 'sodium', 'vitamin', 'mineral',
@@ -222,48 +307,68 @@ const NUTRITION_KEYWORDS = [
     'dairy', 'milk', 'cheese', 'yogurt', 'bread', 'rice', 'pasta', 'grain',
     'salad', 'soup', 'smoothie', 'juice', 'hydrat',
     'pizza', 'burger', 'sandwich', 'sushi', 'coffee', 'tea',
-    // goals & conditions
     'lose weight', 'gain muscle', 'energy', 'fatigue', 'digest', 'gut',
     'allerg', 'intoleran', 'vegan', 'vegetarian', 'keto', 'paleo', 'gluten',
     'intermittent', 'fasting', 'detox', 'cleanse', 'meal plan', 'grocery',
     'diabetes', 'hypertension', 'thyroid', 'pcos', 'celiac', 'obesity',
-    // analysis intent
     'analyze', 'analysis', 'review', 'track', 'log', 'recommend', 'suggest',
     'how much', 'how many', 'is it good', 'is it bad', 'should i eat', 'can i eat',
     'what should', 'what can i', 'will it'
 ];
-const OFFTOPIC_TRIGGERS = [
 
-    'flutter', 'react native', 'react', 'swift', 'kotlin', 'android', 'ios', 'app development', 'coding', 'programming', 'software', 'framework', 'database', 'api', 'backend', 'frontend', 'javascript', 'python', 'java', 'c++', 'html', 'css', 'bug', 'debug',
-    'machine learning', 'artificial intelligence', 'blockchain', 'crypto', 'bitcoin', 'stock', 'stocks', 'invest', 'investment', 'finance', 'money', 'trading', 'forex', 'profit', 'business idea', 'car', 'bike', 'iphone', 'samsung', 'laptop', 'electronics', 'politic', 'politics', 'news',
-    'election', 'government', 'president', 'war', 'game', 'sport', 'sports', 'movie', 'movies', 'film', 'music', 'song', 'songs', 'rapper', 'actor', 'celebrity', 'tv show', 'series', 'netflix',
-    'casino', 'betting', 'gambling', 'hack', 'hacking', 'crack', 'illegal', 'dark web', 'gun', 'weapon', 'bomb', 'explosive', 'drugs', 'cocaine', 'weed', 'weather', 'travel', 'hotel', 'flight',
-    'vacation', 'visa', 'tourism', 'sex', 'porn', 'adult', 'nude',
-    'make an app', 'mobile app', 'flutter app', 'app developer', 'make a diet app', 'diet app'
+// Phrase triggers — substring match (checked first, always wins)
+const OFFTOPIC_PHRASE_TRIGGERS = [
+    'build an app', 'make an app', 'create an app', 'develop an app',
+    'build a app', 'make a app', 'create a app',
+    'build me an app', 'make me an app', 'create me an app',
+    'mobile app', 'web app', 'desktop app', 'diet app', 'fitness app', 'health app',
+    'react native', 'app development', 'machine learning', 'artificial intelligence',
+    'source code', 'open source', 'write code', 'write a code',
+    'app developer', 'flutter app', 'make a diet app',
+    'real estate', 'stock market', 'business idea',
+    'dark web', 'how to hack', 'how to crack'
 ];
+
+// Word triggers — whole-word match (avoids false hits like 'app' inside 'appetite')
+const OFFTOPIC_WORD_TRIGGERS = [
+    'flutter', 'kotlin', 'swift', 'android', 'ios', 'javascript', 'typescript',
+    'python', 'java', 'html', 'css', 'php', 'ruby', 'golang', 'rust', 'dart',
+    'blockchain', 'crypto', 'bitcoin', 'ethereum', 'nft',
+    'forex', 'investing', 'finance', 'stocks',
+    'movie', 'music', 'sport', 'politics', 'weather', 'travel', 'hotel', 'flight',
+    'casino', 'betting', 'gambling', 'hacking',
+    'cocaine', 'weed', 'porn', 'nude', 'sex',
+    'gun', 'weapon', 'bomb', 'explosive'
+];
+
+function wordMatch(word, text) {
+    return new RegExp('(?<![a-z])' + word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?![a-z])').test(text);
+}
 
 function isNutritionRelated(text) {
     const t = text.toLowerCase();
-    // Off-topic check ALWAYS runs first, even for short messages
-    if (OFFTOPIC_TRIGGERS.some(k => t.includes(k))) return false;
 
-    // Very short follow-ups are fine (e.g. 'why?', 'tell me more', 'yes')
+    // 1. Phrase triggers always win — checked before anything else
+    if (OFFTOPIC_PHRASE_TRIGGERS.some(k => t.includes(k))) return false;
+
+    // 2. Whole-word off-topic triggers
+    if (OFFTOPIC_WORD_TRIGGERS.some(k => wordMatch(k, t))) return false;
+
+    // 3. Very short follow-ups are fine (≤3 words: 'why?', 'yes', 'tell me more')
     if (t.trim().split(/\s+/).length <= 3) return true;
 
-    // Allow if any nutrition keyword present
+    // 4. Allow if any nutrition keyword present
     if (NUTRITION_KEYWORDS.some(k => t.includes(k))) return true;
 
-    // Block anything else that is long and has no nutrition context
+    // 5. Block anything else with no nutrition context
     return false;
 }
 
 function getOffTopicReply(text) {
     const preview = text.split(' ').slice(0, 5).join(' ');
-    const t = text.toLowerCase();
-    if (OFFTOPIC_TRIGGERS.some(k => t.includes(k))) {
-        return '<span style="font-size:1.1rem">🥦</span> I\'m a nutrition assistant and can\'t help with <strong>"' + preview + '..."</strong>.<br><br>Ask me about <strong>meals, calories, macros, or your health goals</strong> instead!';
-    }
-    return '<span style="font-size:1.1rem">🥦</span> That topic is outside my scope. I\'m here to help with <strong>nutrition, food choices, meal analysis, and diet planning</strong>.<br><br>What did you eat today?';
+    return '<span style="font-size:1.1rem">🥦</span> I\'m a nutrition assistant and can\'t help with ' +
+        '<strong>"' + preview + '..."</strong>.<br><br>' +
+        'Ask me about <strong>meals, calories, macros, or your health goals</strong> instead!';
 }
 
 // ---- SEND MESSAGE ----
@@ -323,7 +428,26 @@ function appendMsg(role, text) {
     div.className = 'msg ' + role;
     const avatar = role === 'assistant' ? '🤖' : '👤';
     const body = role === 'assistant' ? formatMarkdown(text) : escapeHtml(text);
-    div.innerHTML = '<div class="msg-avatar">' + avatar + '</div><div class="msg-bubble">' + body + '</div>';
+
+    if (role === 'assistant') {
+        const msgId = 'msg-' + Date.now();
+        div.innerHTML =
+            '<div class="msg-avatar">' + avatar + '</div>' +
+            '<div class="msg-col">' +
+            '<div class="msg-bubble" id="' + msgId + '">' + body + '</div>' +
+            '<button class="pdf-btn" onclick="downloadPDF(\'' + msgId + '\')" title="Download as PDF">' +
+            '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">' +
+            '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>' +
+            '<polyline points="7 10 12 15 17 10"/>' +
+            '<line x1="12" y1="15" x2="12" y2="3"/>' +
+            '</svg>' +
+            ' Download Summary PDF' +
+            '</button>' +
+            '</div>';
+    } else {
+        div.innerHTML = '<div class="msg-avatar">' + avatar + '</div><div class="msg-bubble">' + body + '</div>';
+    }
+
     msgs.appendChild(div);
     msgs.scrollTop = msgs.scrollHeight;
 }
@@ -352,6 +476,430 @@ function removeTyping(id) {
     const el = document.getElementById(id);
     if (el) el.remove();
 }
+
+// ---- PDF DOWNLOAD ----
+
+function downloadPDF(msgId) {
+    const btn = document.querySelector('[onclick="downloadPDF(\'' + msgId + '\')"]');
+    if (btn) { btn.textContent = 'Generating...'; btn.disabled = true; }
+
+    // Load jsPDF dynamically if not already loaded
+    if (!window.jspdf) {
+        const script = document.createElement('script');
+        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+        script.onload = () => generatePDF(msgId, btn);
+        document.head.appendChild(script);
+    } else {
+        generatePDF(msgId, btn);
+    }
+}
+
+function generatePDF(msgId, btn) {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+
+    const pageW = doc.internal.pageSize.getWidth();
+    const pageH = doc.internal.pageSize.getHeight();
+    const margin = 14;
+    const cW = pageW - margin * 2;
+    let y = margin;
+
+    // ── Colour palette (white-background, high-contrast) ──
+    const C = {
+        headerBg: [22, 101, 52],    // deep green header bar
+        headerText: [255, 255, 255],  // white text on header
+        accent: [21, 128, 61],    // medium green for section titles
+        accentLight: [220, 252, 231],  // very light green for table header row
+        accentDark: [22, 101, 52],    // dark green text on light header row
+        rowOdd: [255, 255, 255],  // white
+        rowEven: [243, 250, 245],  // barely-green tint
+        cellText: [17, 24, 39],   // near-black for readability
+        valueText: [21, 128, 61],    // green for numeric values (calories col)
+        labelText: [55, 65, 81],   // dark-grey for first-col labels
+        border: [186, 230, 206],  // light green border
+        metaBg: [240, 253, 244],  // very light green for profile card bg
+        metaBorder: [134, 239, 172],  // medium-light green border
+        muted: [107, 114, 128],  // grey for small labels
+        warning: [161, 98, 7],  // amber for medical notes
+        warningBg: [254, 243, 199],  // light amber bg
+        white: [255, 255, 255],
+        pageText: [17, 24, 39],
+    };
+
+    const now = new Date();
+
+    // ── helpers ───────────────────────────────────────────
+    const newPage = () => {
+        doc.addPage();
+        doc.setFillColor(...C.headerBg);
+        doc.rect(0, 0, pageW, 10, 'F');
+        doc.setTextColor(...C.headerText);
+        doc.setFontSize(7); doc.setFont('helvetica', 'bold');
+        doc.text('NutriAI · Nutrition Analysis Report', margin, 7);
+        doc.setTextColor(...C.muted);
+        doc.setFont('helvetica', 'normal');
+        doc.text('Continued', pageW - margin, 7, { align: 'right' });
+        doc.setFillColor(...C.white); doc.rect(0, 10, pageW, pageH - 10, 'F');
+        y = 20;
+    };
+    const checkY = (need) => { if (y + need > pageH - 16) newPage(); };
+    const hline = (yy, clr = C.border, w = 0.4) => {
+        doc.setDrawColor(...clr); doc.setLineWidth(w);
+        doc.line(margin, yy, pageW - margin, yy);
+    };
+    const sectionTitle = (text) => {
+        checkY(12);
+        doc.setFillColor(...C.accentLight);
+        doc.roundedRect(margin, y - 1, cW, 8, 1, 1, 'F');
+        doc.setTextColor(...C.accentDark);
+        doc.setFontSize(8.5); doc.setFont('helvetica', 'bold');
+        doc.text(text, margin + 3, y + 5);
+        y += 11;
+    };
+
+    // ── WHITE PAGE BACKGROUND ─────────────────────────────
+    doc.setFillColor(...C.white);
+    doc.rect(0, 0, pageW, pageH, 'F');
+
+    // ── HEADER BAR ────────────────────────────────────────
+    doc.setFillColor(...C.headerBg);
+    doc.rect(0, 0, pageW, 28, 'F');
+
+    doc.setTextColor(...C.headerText);
+    doc.setFontSize(20); doc.setFont('helvetica', 'bold');
+    doc.text('NutriAI', margin, 18);
+
+    doc.setFontSize(9); doc.setFont('helvetica', 'normal');
+    doc.text('Nutrition Analysis Report', margin + 38, 18);
+
+    doc.setFontSize(8);
+    const dateStr = now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+        + '  ' + now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+    doc.text(dateStr, pageW - margin, 18, { align: 'right' });
+
+    y = 36;
+
+    // ── PROFILE CARD ──────────────────────────────────────
+    if (userProfile && userProfile.biometrics) {
+        const b = userProfile.biometrics;
+        const cal = calculateCalories();
+
+        // Card border
+        doc.setFillColor(...C.metaBg);
+        doc.roundedRect(margin, y, cW, 32, 3, 3, 'F');
+        doc.setDrawColor(...C.metaBorder); doc.setLineWidth(0.5);
+        doc.roundedRect(margin, y, cW, 32, 3, 3, 'S');
+
+        // Profile columns
+        const pcols = [
+            { label: 'AGE', val: b.age + ' yrs' },
+            { label: 'WEIGHT', val: b.weight + ' kg' },
+            { label: 'HEIGHT', val: b.height + ' cm' },
+            { label: 'GENDER', val: b.gender || '—' },
+            { label: 'ACTIVITY', val: b.activity ? b.activity.split('(')[0].trim() : '—' },
+        ];
+        const pcW = cW / pcols.length;
+        pcols.forEach((col, i) => {
+            const cx = margin + pcW * i + pcW / 2;
+            // Vertical divider
+            if (i > 0) {
+                doc.setDrawColor(...C.metaBorder); doc.setLineWidth(0.3);
+                doc.line(margin + pcW * i, y + 5, margin + pcW * i, y + 28);
+            }
+            doc.setTextColor(...C.muted);
+            doc.setFontSize(6.5); doc.setFont('helvetica', 'bold');
+            doc.text(col.label, cx, y + 12, { align: 'center' });
+
+            doc.setTextColor(...C.accentDark);
+            doc.setFontSize(10); doc.setFont('helvetica', 'bold');
+            doc.text(col.val, cx, y + 24, { align: 'center' });
+        });
+
+        y += 38;
+
+        // Goals & medical note row
+        if (userProfile.goals.length || cal.condNote) {
+            if (userProfile.goals.length) {
+                // Strip emojis — jsPDF built-in fonts cannot render them
+                const cleanGoals = userProfile.goals
+                    .map(g => g.replace(/[^\x20-\x7E]/g, '').trim())
+                    .filter(g => g.length > 0)
+                    .join('  |  ');
+
+                doc.setFontSize(7.5); doc.setFont('helvetica', 'bold');
+                doc.setTextColor(...C.accentDark);
+                doc.text('Goals:', margin, y);
+                doc.setFont('helvetica', 'normal');
+                doc.setTextColor(...C.cellText);
+                const gText = doc.splitTextToSize(cleanGoals, cW - 18);
+                gText.forEach((gl, gi) => {
+                    doc.text(gl, margin + 16, y + gi * 5);
+                });
+                y += gText.length * 5 + 4;
+            }
+            if (cal.condNote) {
+                doc.setFillColor(...C.warningBg);
+                doc.roundedRect(margin, y, cW, 9, 2, 2, 'F');
+                doc.setDrawColor(...[253, 211, 77]); doc.setLineWidth(0.4);
+                doc.roundedRect(margin, y, cW, 9, 2, 2, 'S');
+                doc.setTextColor(...C.warning);
+                doc.setFontSize(7.5); doc.setFont('helvetica', 'bold');
+                doc.text('⚕ Medical Note:', margin + 3, y + 6);
+                doc.setFont('helvetica', 'normal');
+                doc.text(cal.condNote, margin + 30, y + 6);
+                y += 13;
+            }
+        }
+
+        y += 4;
+        hline(y, C.metaBorder, 0.5); y += 8;
+
+        // ── DAILY TARGETS TABLE ───────────────────────────
+        sectionTitle('Daily Calorie & Macro Targets');
+
+        const tRows = [
+            ['Metric', 'Value', 'How it is calculated'],
+            ['Basal Metabolic Rate', cal.bmr.toLocaleString() + ' kcal', 'Mifflin-St Jeor: 10W + 6.25H - 5A ± 5'],
+            ['TDEE', cal.tdee.toLocaleString() + ' kcal', 'BMR × activity level multiplier'],
+            ['Goal Adjustment', (cal.goalNote || '').replace(/[^\x20-\x7E]/g, '-'), 'Applied based on your selected goals'],
+            ['Daily Calorie Target', cal.target.toLocaleString() + ' kcal', 'TDEE + goal adjustment'],
+            ['Protein', cal.protein + 'g  (' + Math.round(cal.protein * 4) + ' kcal)', '30% of daily calories ÷ 4 kcal/g'],
+            ['Carbohydrates', cal.carbs + 'g  (' + Math.round(cal.carbs * 4) + ' kcal)', '40% of daily calories ÷ 4 kcal/g'],
+            ['Fat', cal.fat + 'g  (' + Math.round(cal.fat * 9) + ' kcal)', '30% of daily calories ÷ 9 kcal/g'],
+        ];
+        y = drawTable(doc, margin, y, cW, tRows, [60, 48, cW - 108], C);
+        y += 8;
+    }
+
+    // ── PARSE RESPONSE ────────────────────────────────────
+    const bubble = document.getElementById(msgId);
+    const rawText = bubble ? bubble.innerText : '';
+    const lines = rawText.split('\n').map(l => l.trim()).filter(l => l !== '');
+
+    const nutritionRows = [];
+    const textLines = [];
+
+    lines.forEach(line => {
+        const numHead = line.match(/^(\d+)\.\s+(.+)/);
+        const isBullet = line.match(/^[-•]\s+(.+)/);
+        const hasNumber = /\d+(?:[.,]\d+)?\s*(?:kcal|cal|calories?|g|mg|%)/i.test(line);
+
+        if (hasNumber) {
+            const parsed = parseNutritionLine(line);
+            if (parsed) {
+                const prefix = numHead ? numHead[1] + '. ' : (isBullet ? '• ' : '');
+                nutritionRows.push([prefix + parsed.name, parsed.calories, parsed.protein, parsed.carbs, parsed.fat]);
+            } else {
+                textLines.push({ type: numHead ? 'heading' : (isBullet ? 'bullet' : 'text'), text: line });
+            }
+        } else {
+            textLines.push({ type: numHead ? 'heading' : (isBullet ? 'bullet' : 'text'), text: line });
+        }
+    });
+
+    // ── helper: strip non-printable / non-ASCII chars safe for Helvetica
+    const safe = (str) => String(str == null ? '' : str).replace(/[^\x20-\x7E]/g, '').trim();
+
+    // ── Sanitise all nutrition rows ────────────────────────
+    const safeNutRows = nutritionRows
+        .map(row => row.map(cell => safe(cell)))
+        .filter(row => {
+            // Drop row if all value cells (cols 1-4) are '-' or empty — no real data
+            const vals = row.slice(1);
+            return vals.some(v => v && v !== '-' && v !== '');
+        });
+
+    // ── NUTRITION BREAKDOWN TABLE — only if real data exists ──
+    if (safeNutRows.length > 0) {
+        checkY(20);
+        sectionTitle('Nutritional Breakdown from AI Response');
+        const nHeaders = [['Food / Item', 'Calories', 'Protein', 'Carbs', 'Fat']];
+        y = drawTable(doc, margin, y, cW, nHeaders.concat(safeNutRows), [60, 32, 30, 30, cW - 152], C);
+        y += 8;
+    } else {
+        // Fallback: look for "Label: 123 kcal" style pairs
+        const fallback = [['Metric', 'Value']];
+        let fm;
+        const frx = /([A-Za-z][A-Za-z\s]{2,25}?):\s*(\d+(?:[.,]\d+)?\s*(?:kcal|cal|g|mg|%|calories?))/gi;
+        while ((fm = frx.exec(rawText)) !== null) {
+            const label = safe(fm[1]);
+            const val = safe(fm[2]);
+            if (label && val) fallback.push([label, val]);
+        }
+
+        if (fallback.length > 1) {
+            checkY(20);
+            sectionTitle('Nutritional Data');
+            y = drawTable(doc, margin, y, cW, fallback, [cW * 0.55, cW * 0.45], C);
+            y += 8;
+        }
+        // If still no data — skip section entirely, no placeholder text shown
+    }
+
+    // ── ANALYSIS SUMMARY — only if meaningful text lines exist ──
+    const meaningfulLines = textLines.filter(item => {
+        const t = safe(item.text);
+        // Skip lines that are just dashes, numbers alone, or very short noise
+        return t.length > 4 && !/^[-\s\d.]+$/.test(t);
+    });
+
+    if (meaningfulLines.length > 0) {
+        checkY(16);
+        sectionTitle('Analysis & Recommendations');
+        meaningfulLines.forEach(item => {
+            const isHead = item.type === 'heading';
+            const isBull = item.type === 'bullet';
+            const cleanTxt = safe(item.text);
+            const prefix = isBull ? '  ' : '';
+            const wrapped = doc.splitTextToSize(prefix + cleanTxt, cW - (isBull ? 5 : 0));
+            checkY(wrapped.length * 5.5 + 3);
+
+            if (isHead) {
+                y += 2;
+                doc.setFont('helvetica', 'bold'); doc.setTextColor(...C.accentDark); doc.setFontSize(8.5);
+            } else {
+                doc.setFont('helvetica', 'normal'); doc.setTextColor(...C.cellText); doc.setFontSize(8);
+            }
+            wrapped.forEach(wl => {
+                doc.text(wl, margin + (isBull ? 4 : 0), y);
+                y += 5.2;
+            });
+            if (isHead) y += 1;
+        });
+    }
+
+    // ── FOOTER ────────────────────────────────────────────
+    const total = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= total; i++) {
+        doc.setPage(i);
+        doc.setFillColor(...C.headerBg);
+        doc.rect(0, pageH - 10, pageW, 10, 'F');
+        doc.setTextColor(...C.headerText); doc.setFontSize(6.5); doc.setFont('helvetica', 'normal');
+        doc.text('NutriAI · AI-powered Nutrition Analysis · Not a substitute for professional medical advice', margin, pageH - 4);
+        doc.text('Page ' + i + ' of ' + total, pageW - margin, pageH - 4, { align: 'right' });
+    }
+
+    const filename = 'NutriAI-Report-' + now.toISOString().slice(0, 10) + '.pdf';
+    doc.save(filename);
+
+    if (btn) {
+        btn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Download Summary PDF';
+        btn.disabled = false;
+    }
+}
+
+
+// ── TABLE DRAW HELPER ─────────────────────────────────────────
+function drawTable(doc, x, y, totalW, rows, colWidths, C) {
+    const lineH = 4.8;   // mm per text line
+    const padV = 3.5;   // vertical padding inside cell (top + bottom combined)
+    const padH = 2.5;   // horizontal padding inside cell
+
+    rows.forEach((row, ri) => {
+        const isHeader = ri === 0;
+
+        // ── Set font per row so splitTextToSize measures correctly ──
+        const setupFont = (ci) => {
+            if (isHeader) {
+                doc.setFontSize(7.5); doc.setFont('helvetica', 'bold');
+            } else if (ci === 0) {
+                doc.setFontSize(7.5); doc.setFont('helvetica', 'normal');
+            } else if (ci === 1) {
+                doc.setFontSize(8); doc.setFont('helvetica', 'bold');
+            } else {
+                doc.setFontSize(7.5); doc.setFont('helvetica', 'normal');
+            }
+        };
+
+        // ── Calculate dynamic row height based on worst-case cell ──
+        let maxLines = 1;
+        row.forEach((cell, ci) => {
+            setupFont(ci);
+            const cw = colWidths[ci] || 30;
+            const lines = doc.splitTextToSize(String(cell == null ? '' : cell), cw - padH * 2);
+            if (lines.length > maxLines) maxLines = lines.length;
+        });
+        const rowH = maxLines * lineH + padV * 2;
+
+        // ── Draw row background ──
+        doc.setFillColor(...(isHeader ? C.accentLight : (ri % 2 === 0 ? C.rowOdd : C.rowEven)));
+        doc.rect(x, y, totalW, rowH, 'F');
+
+        // ── Draw row outer border ──
+        doc.setDrawColor(...C.border); doc.setLineWidth(0.25);
+        doc.rect(x, y, totalW, rowH, 'S');
+
+        // ── Draw cells ──
+        let cx = x;
+        row.forEach((cell, ci) => {
+            const cw = colWidths[ci] || 30;
+            const cellStr = String(cell == null ? '' : cell);
+
+            setupFont(ci);
+
+            // Text colour
+            if (isHeader) {
+                doc.setTextColor(...C.accentDark);
+            } else if (ci === 0) {
+                doc.setTextColor(...C.labelText);
+            } else if (ci === 1) {
+                doc.setTextColor(...C.accentDark);
+            } else {
+                doc.setTextColor(...C.cellText);
+            }
+
+            const maxW = cw - padH * 2;
+            const lines = doc.splitTextToSize(cellStr, maxW);
+
+            // Total text block height
+            const blockH = lines.length * lineH;
+            // Vertically center the text block within the row
+            const startY = y + (rowH - blockH) / 2 + lineH * 0.75;
+
+            lines.forEach((ln, li) => {
+                doc.text(ln, cx + padH, startY + li * lineH);
+            });
+
+            // Vertical cell divider
+            doc.setDrawColor(...C.border); doc.setLineWidth(0.2);
+            doc.line(cx + cw, y, cx + cw, y + rowH);
+
+            cx += cw;
+        });
+
+        y += rowH;
+    });
+
+    return y;
+}
+
+// ── PARSE NUTRITION FROM A LINE ───────────────────────────────
+function parseNutritionLine(line) {
+    const calMatch = line.match(/(\d+(?:[.,]\d+)?)\s*(?:kcal|cal|calories?)/i);
+    const protMatch = line.match(/(\d+(?:[.,]\d+)?)\s*g?\s*protein/i);
+    const carbMatch = line.match(/(\d+(?:[.,]\d+)?)\s*g?\s*carb/i);
+    const fatMatch = line.match(/(\d+(?:[.,]\d+)?)\s*g?\s*fat/i);
+
+    if (!calMatch && !protMatch && !carbMatch && !fatMatch) return null;
+
+    // Clean the name: remove all numeric+unit patterns to get food name
+    let name = line
+        .replace(/\d+(?:[.,]\d+)?\s*(?:kcal|cal|calories?|g|mg|%)/gi, '')
+        .replace(/[-•:,()[\]]/g, ' ')
+        .replace(/\s{2,}/g, ' ')
+        .trim()
+        .slice(0, 40);
+
+    return {
+        name: name || 'Item',
+        calories: calMatch ? calMatch[1] + ' kcal' : '-',
+        protein: protMatch ? protMatch[1] + 'g' : '-',
+        carbs: carbMatch ? carbMatch[1] + 'g' : '-',
+        fat: fatMatch ? fatMatch[1] + 'g' : '-',
+        notes: '',
+    };
+}
+
 
 // ---- UTILITIES ----
 
