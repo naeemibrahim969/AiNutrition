@@ -371,6 +371,205 @@ function getOffTopicReply(text) {
         'Ask me about <strong>meals, calories, macros, or your health goals</strong> instead!';
 }
 
+// ---- VAGUE FOOD DETECTION ----
+
+// Generic food category words that need specification
+const VAGUE_FOOD_WORDS = [
+    'fruits', 'fruit', 'vegetables', 'veggies', 'veggie', 'vegetable',
+    'nuts', 'seeds', 'grains', 'legumes', 'beans', 'lentils',
+    'meat', 'seafood', 'fish', 'dairy', 'snacks', 'sweets',
+    'dessert', 'juice', 'soup', 'salad', 'curry', 'bread',
+    'cereals', 'leftovers', 'food', 'meal', 'something', 'stuff',
+    'things', 'items', 'products', 'drinks', 'beverages'
+];
+
+// Words that indicate a quantity is present — if found, no need to ask
+const QUANTITY_WORDS = [
+    'gram', 'grams', 'g ', 'kg', 'ml', 'liter', 'litre', 'cup', 'cups',
+    'piece', 'pieces', 'slice', 'slices', 'bowl', 'bowls', 'plate',
+    'handful', 'spoon', 'tablespoon', 'teaspoon', 'medium', 'large', 'small',
+    'half', 'quarter', 'serving', 'portion', 'bottle', 'glass',
+    '100g', '200g', '250g', '500g', '1 cup', '2 cup',
+    /\d+\s*g\b/, /\d+\s*ml\b/, /\d+\s*kg\b/,
+    /\d+\s*(piece|slice|bowl|cup|plate|serving)/
+];
+
+// Specific food names — if present alongside vague word, it is specific enough
+const SPECIFIC_FOODS = [
+    'apple', 'banana', 'orange', 'mango', 'grape', 'strawberr', 'blueberr',
+    'watermelon', 'pineapple', 'papaya', 'guava', 'kiwi', 'lemon', 'lime',
+    'spinach', 'broccoli', 'carrot', 'tomato', 'cucumber', 'onion', 'garlic',
+    'potato', 'sweet potato', 'corn', 'peas', 'lettuce', 'cabbage', 'cauliflower',
+    'chicken', 'beef', 'pork', 'lamb', 'turkey', 'salmon', 'tuna', 'shrimp',
+    'egg', 'milk', 'cheese', 'yogurt', 'butter', 'cream',
+    'rice', 'pasta', 'bread', 'oats', 'quinoa', 'wheat',
+    'almond', 'walnut', 'cashew', 'peanut', 'pistachio',
+    'lentil', 'chickpea', 'kidney bean', 'black bean',
+    'pizza', 'burger', 'sandwich', 'sushi', 'noodle', 'roti', 'chapati',
+    'dal', 'biryani', 'curry', 'stew', 'soup', 'salad'
+];
+
+function hasQuantity(text) {
+    const t = text.toLowerCase();
+    return QUANTITY_WORDS.some(q => {
+        if (q instanceof RegExp) return q.test(t);
+        return t.includes(q);
+    });
+}
+
+// Map each vague category to its specific members
+const VAGUE_CATEGORY_MAP = {
+    'fruits': ['apple', 'banana', 'orange', 'mango', 'grape', 'strawberr', 'blueberr', 'watermelon', 'pineapple', 'papaya', 'guava', 'kiwi', 'lemon', 'lime', 'peach', 'plum', 'cherry', 'fig', 'date', 'coconut'],
+    'fruit': ['apple', 'banana', 'orange', 'mango', 'grape', 'strawberr', 'blueberr', 'watermelon', 'pineapple', 'papaya', 'guava', 'kiwi', 'lemon', 'lime', 'peach', 'plum', 'cherry'],
+    'vegetables': ['spinach', 'broccoli', 'carrot', 'tomato', 'cucumber', 'onion', 'garlic', 'potato', 'sweet potato', 'corn', 'peas', 'lettuce', 'cabbage', 'cauliflower', 'zucchini', 'eggplant', 'celery', 'beet', 'radish', 'asparagus'],
+    'vegetable': ['spinach', 'broccoli', 'carrot', 'tomato', 'cucumber', 'onion', 'garlic', 'potato', 'sweet potato', 'corn', 'peas', 'lettuce', 'cabbage', 'cauliflower'],
+    'veggies': ['spinach', 'broccoli', 'carrot', 'tomato', 'cucumber', 'onion', 'garlic', 'potato', 'peas', 'lettuce', 'cabbage', 'cauliflower'],
+    'veggie': ['spinach', 'broccoli', 'carrot', 'tomato', 'cucumber', 'onion', 'garlic', 'potato', 'peas'],
+    'nuts': ['almond', 'walnut', 'cashew', 'peanut', 'pistachio', 'pecan', 'hazelnut', 'macadamia'],
+    'seeds': ['chia', 'flax', 'sunflower seed', 'pumpkin seed', 'sesame'],
+    'meat': ['chicken', 'beef', 'pork', 'lamb', 'turkey', 'duck', 'mutton', 'veal'],
+    'seafood': ['salmon', 'tuna', 'shrimp', 'prawn', 'crab', 'lobster', 'cod', 'tilapia', 'sardine', 'mackerel'],
+    'fish': ['salmon', 'tuna', 'cod', 'tilapia', 'sardine', 'mackerel', 'trout', 'catfish', 'herring'],
+    'dairy': ['milk', 'cheese', 'yogurt', 'butter', 'cream', 'paneer', 'ghee', 'curd'],
+    'grains': ['rice', 'pasta', 'bread', 'oats', 'quinoa', 'wheat', 'barley', 'millet', 'corn', 'rye'],
+    'legumes': ['lentil', 'chickpea', 'kidney bean', 'black bean', 'soybean', 'pea', 'dal'],
+    'beans': ['lentil', 'chickpea', 'kidney bean', 'black bean', 'soybean', 'rajma', 'dal'],
+    'snacks': ['chips', 'crackers', 'popcorn', 'cookie', 'biscuit', 'granola', 'pretzel'],
+    'sweets': ['chocolate', 'candy', 'cake', 'ice cream', 'brownie', 'donut', 'pastry'],
+    'dessert': ['chocolate', 'cake', 'ice cream', 'brownie', 'donut', 'pastry', 'pudding', 'pie'],
+    'juice': ['orange juice', 'apple juice', 'grape juice', 'mango juice', 'carrot juice'],
+    'drinks': ['milk', 'juice', 'water', 'soda', 'tea', 'coffee', 'smoothie', 'shake'],
+    'beverages': ['milk', 'juice', 'water', 'soda', 'tea', 'coffee', 'smoothie', 'shake'],
+    'bread': ['white bread', 'whole wheat', 'sourdough', 'roti', 'chapati', 'pita', 'baguette'],
+    'cereals': ['cornflakes', 'oatmeal', 'muesli', 'granola', 'wheat flakes'],
+    'curry': ['chicken curry', 'vegetable curry', 'dal', 'butter chicken', 'paneer curry'],
+    'soup': ['tomato soup', 'chicken soup', 'vegetable soup', 'lentil soup', 'minestrone'],
+    'salad': ['caesar salad', 'greek salad', 'garden salad', 'coleslaw', 'pasta salad'],
+    'food': ['apple', 'banana', 'chicken', 'rice', 'bread', 'egg', 'milk', 'pasta', 'potato'],
+    'meal': ['apple', 'banana', 'chicken', 'rice', 'bread', 'egg', 'milk', 'pasta', 'potato'],
+    'seafood': ['salmon', 'tuna', 'shrimp', 'prawn', 'crab'],
+};
+
+function getVagueFoods(text) {
+    const t = text.toLowerCase();
+    const found = [];
+
+    VAGUE_FOOD_WORDS.forEach(word => {
+        if (t.includes(word)) {
+            const categorySpecifics = VAGUE_CATEGORY_MAP[word] || SPECIFIC_FOODS;
+            const hasSpecific = categorySpecifics.some(sf => t.includes(sf));
+            if (!hasSpecific) found.push(word);
+        }
+    });
+
+    // De-duplicate: if both singular & plural matched (fruit/fruits), keep only plural
+    const deduped = found.filter(w => {
+        return !found.includes(w + 's') && !found.includes(w + 'ies');
+    });
+
+    return [...new Set(deduped)];
+}
+
+function isMealCalculationRequest(text) {
+    const t = text.toLowerCase().trim();
+
+    // Explicit meal/calculation triggers
+    const mealTriggers = [
+        'i ate', 'i eat', 'i had', 'i have', 'i consumed', 'i drank', 'i drink',
+        'ate', 'eaten', 'had', 'consumed', 'calculate', 'analyze', 'analyse',
+        'how many calories', 'how much calorie', 'calorie in', 'calories in',
+        'nutritional value', 'nutrition of', 'meal was', 'breakfast was',
+        'lunch was', 'dinner was', 'snack was', 'for breakfast', 'for lunch',
+        'for dinner', 'for snack'
+    ];
+    if (mealTriggers.some(trigger => t.includes(trigger))) return true;
+
+    // Also treat it as a meal request if the message is ONLY a food list
+    // (comma-separated items, no question words, no verb needed)
+    // e.g. "Fruits, vegetables, rice, milk"
+    const hasCommaList = t.includes(',');
+    const hasQuestionWord = /^(what|how|why|when|where|who|which|can|does|do|is|are|will)/.test(t);
+    const hasVagueFoods = VAGUE_FOOD_WORDS.some(w => t.includes(w));
+    const hasAnyFood = SPECIFIC_FOODS.some(w => t.includes(w)) || hasVagueFoods;
+
+    if (hasCommaList && hasAnyFood && !hasQuestionWord) return true;
+
+    // Single food word alone — e.g. just "fruits" or "rice and milk"
+    const words = t.split(/[\s,]+/).filter(Boolean);
+    const allFoodWords = words.every(w =>
+        SPECIFIC_FOODS.some(f => f.startsWith(w) || w.startsWith(f)) ||
+        VAGUE_FOOD_WORDS.includes(w) ||
+        ['and', 'or', 'with', 'some', 'a', 'the', 'of'].includes(w)
+    );
+    if (allFoodWords && words.length >= 1 && hasAnyFood) return true;
+
+    return false;
+}
+
+function buildClarificationReply(vagueFoods, originalText) {
+    const listed = vagueFoods
+        .map(f => '<strong>' + f.charAt(0).toUpperCase() + f.slice(1) + '</strong>')
+        .join(' and ');
+
+    // Per-category example and suggested replacement
+    const exampleMap = {
+        'fruits': { eg: '1 medium apple (182g), 2 bananas (240g), 1 cup grapes (150g)', replace: /fruits?/gi, with: '1 medium apple, 2 bananas' },
+        'fruit': { eg: '1 medium apple (182g), 2 bananas (240g), 1 cup grapes (150g)', replace: /fruits?/gi, with: '1 medium apple, 2 bananas' },
+        'vegetables': { eg: '1 cup spinach (30g), 2 medium carrots (120g), 1 bowl broccoli', replace: /vegetables?|veggies?/gi, with: '1 cup spinach, 2 medium carrots' },
+        'vegetable': { eg: '1 cup spinach (30g), 2 medium carrots (120g)', replace: /vegetables?|veggies?/gi, with: '1 cup spinach, 2 medium carrots' },
+        'veggies': { eg: '1 cup spinach (30g), 2 medium carrots (120g)', replace: /veggies?/gi, with: '1 cup spinach, 2 medium carrots' },
+        'nuts': { eg: '20g almonds (~23 nuts), 10 cashews (14g), 1 handful walnuts', replace: /nuts/gi, with: '20g almonds, 10 cashews' },
+        'meat': { eg: '150g grilled chicken breast, 100g beef steak', replace: /meat/gi, with: '150g chicken breast' },
+        'fish': { eg: '150g salmon fillet, 1 medium tuna steak (130g)', replace: /fish/gi, with: '150g salmon fillet' },
+        'seafood': { eg: '150g shrimp, 200g salmon fillet', replace: /seafood/gi, with: '150g shrimp' },
+        'dairy': { eg: '1 cup milk (250ml), 30g cheddar cheese, 1 yogurt (150g)', replace: /dairy/gi, with: '250ml milk, 30g cheese' },
+        'grains': { eg: '1 cup cooked rice (200g), 2 slices bread (60g)', replace: /grains?/gi, with: '1 cup cooked rice' },
+        'beans': { eg: '1 cup cooked lentils (200g), half cup chickpeas (82g)', replace: /beans?|legumes?/gi, with: '1 cup cooked lentils' },
+        'soup': { eg: '1 bowl tomato soup (300ml), 1 bowl lentil soup (350ml)', replace: /soup/gi, with: '1 bowl tomato soup (300ml)' },
+        'salad': { eg: '2 cups mixed greens, 1 tomato, 50g feta, 1 tbsp olive oil', replace: /salad/gi, with: '2 cups mixed greens salad' },
+        'snacks': { eg: '30g potato chips, 2 digestive biscuits (30g)', replace: /snacks?/gi, with: '30g chips' },
+        'juice': { eg: '200ml orange juice, 1 glass apple juice (240ml)', replace: /juice/gi, with: '200ml orange juice' },
+        'drinks': { eg: '1 glass milk (250ml), 200ml orange juice', replace: /drinks?|beverages?/gi, with: '250ml milk' },
+        'beverages': { eg: '1 glass milk (250ml), 200ml orange juice', replace: /beverages?|drinks?/gi, with: '250ml milk' },
+        'bread': { eg: '2 slices whole wheat bread (60g), 1 roti (35g)', replace: /bread/gi, with: '2 slices whole wheat bread' },
+        'cereals': { eg: '1 cup cornflakes (30g) with 200ml milk', replace: /cereals?/gi, with: '1 cup cornflakes (30g)' },
+        'dessert': { eg: '1 slice chocolate cake (80g), 1 scoop ice cream (60g)', replace: /desserts?|sweets?/gi, with: '1 slice cake (80g)' },
+        'sweets': { eg: '2 pieces dark chocolate (20g), 3 hard candies (15g)', replace: /sweets?/gi, with: '20g dark chocolate' },
+        'curry': { eg: '1 bowl chicken curry (300g) with 1 cup rice (200g)', replace: /curry/gi, with: '1 bowl chicken curry (300g)' },
+    };
+
+    // Build per-food example rows
+    let exampleRows = '';
+    vagueFoods.forEach(f => {
+        const info = exampleMap[f];
+        if (info) {
+            exampleRows +=
+                '<div style="margin:5px 0; padding:6px 10px; background:rgba(95,219,138,0.08); border-left:3px solid var(--accent2); border-radius:4px;">' +
+                '<strong style="color:var(--accent)">' + f.charAt(0).toUpperCase() + f.slice(1) + '</strong> &rarr; ' +
+                '<span style="color:var(--text-muted);font-size:0.88em">' + info.eg + '</span>' +
+                '</div>';
+        }
+    });
+
+    // Build suggested rewrite of the original message
+    let suggested = originalText;
+    vagueFoods.forEach(f => {
+        const info = exampleMap[f];
+        if (info) suggested = suggested.replace(info.replace, info.with);
+    });
+
+    // Inline click-to-use suggestion
+    const tryLine = '<br><div style="margin-top:10px;font-size:0.85em;color:var(--text-muted)">Try something like:</div>' +
+        '<span class="chip" style="margin-top:4px;display:inline-block;cursor:pointer" onclick="useChip(this)">' +
+        '&#x270F; ' + suggested +
+        '</span>';
+
+    return '<strong>Please be more specific</strong> about ' + listed + ' to get accurate calorie counts.<br><br>' +
+        '<div style="font-size:0.88em;color:var(--text-muted);margin-bottom:8px">Include the <strong style="color:var(--text)">food name</strong> and <strong style="color:var(--text)">quantity</strong> (grams / cups / pieces / ml)</div>' +
+        exampleRows +
+        tryLine;
+}
+
 // ---- SEND MESSAGE ----
 
 async function sendMessage() {
@@ -385,6 +584,18 @@ async function sendMessage() {
         input.value = '';
         input.style.height = 'auto';
         return;
+    }
+
+    // Vague food guard — ask for specifics before API call
+    if (isMealCalculationRequest(text) && !hasQuantity(text)) {
+        const vagueFoods = getVagueFoods(text);
+        if (vagueFoods.length > 0) {
+            appendMsg('user', text);
+            appendRawMsg('assistant', buildClarificationReply(vagueFoods, text));
+            input.value = '';
+            input.style.height = 'auto';
+            return;
+        }
     }
 
     appendMsg('user', text);
