@@ -275,8 +275,6 @@ function showWelcome() {
         '<span class="chip" onclick="useChip(this)">🍳 I had 3 eggs and toast for breakfast</span>' +
         '<span class="chip" onclick="useChip(this)">🥗 Analyze my lunch salad</span>' +
         '<span class="chip" onclick="useChip(this)">🍕 I ate medium pizza last night</span>' +
-        '<span class="chip" onclick="useChip(this)">3 boiled Eggs, White bread toast with Butter and Jam along with glass of milk.</span>' +
-        '<span class="chip" onclick="useChip(this)">Lentils soup, Spinach and cheese pasta, a cup of ayran, pan grilled salmon marinated with natural green herbs.</span>' +
         '</div>' +
         '</div>';
 }
