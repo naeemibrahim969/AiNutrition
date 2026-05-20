@@ -84,7 +84,7 @@ def build_system_prompt(profile):
     conditions_str = ', '.join(conditions) if conditions else 'none'
     goals_str = ', '.join(goals) if goals else 'general health'
 
-    # Calculate rough BMI if possible
+    # Calculate rough BMI
     bmi_info = ""
     try:
         w_kg = float(weight)
@@ -143,6 +143,8 @@ RULES:
 - Consider medical conditions carefully
 
 - Encourage healthier alternatives
+
+- Nutritional Breakdown should tell Carbohydrates, Proteins, Fats, Vitamins, Minerals, Fiber, Water
 
 
 
